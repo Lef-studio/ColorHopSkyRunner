@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Color Hop! — LEF STUDIO</title>
+<style>
+  :root {
+    --sky-top: #1899e8;
+    --sky-mid: #4ec5f7;
+    --sky-bot: #e5f7c8;
+    --glass: rgba(15, 25, 45, 0.78);
+    --glass-border: rgba(255, 255, 255, 0.25);
+    --gold: #ffd700;
+    --cyan: #00f2fe;
+    --pink: #ff0844;
+    --purple: #9b51e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1899e8; touch-action: none; }
+  #gameCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+  
+  /* UI OVERLAYS */
+  .ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; }
+  .interactive { pointer-events: auto; }
+  
+  /* TOP HEADER */
+  #topHeaderZone {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; background: rgba(10, 18, 35, 0.65);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--glass-border);
+    gap: 6px; width: 100%;
+  }
+  .header-left, .header-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.28);
+    color: #fff; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800;
+    cursor: pointer; transition: transform 0.12s; white-space: nowrap;
+  }
+  .pill:active { transform: scale(0.93); }
+  .pill-gold { background: linear-gradient(135deg, #f6d365, #fda085); color: #1a1a2e; border-color: #fff; }
+  .vip-crown-pill {
+    width: 26px; height: 26px; border-radius: 50%; display: none;
+    align-items: center; justify-content: center; font-size: 14px;
+    background: linear-gradient(135deg, #ffd700, #ff8c00); border: 1.5px solid #fff;
+    box-shadow: 0 0 10px rgba(255,215,0,0.8);
+  }
+  .vip-crown-pill.active { display: inline-flex; }
+
+  /* HOME OVERLAY */
+  #homeOverlay {
+    position: absolute; inset: 52px 0 0 0; display: flex; flex-direction: column;
+    justify-content: space-between; align-items: center; padding: 10px 12px 14px; pointer-events: none;
+  }
+  .title-block { text-align: center; margin-top: 2px; pointer-events: auto; }
+  .studio-badge {
+    display: inline-block; background: linear-gradient(90deg, #ffd700, #ffae00);
+    color: #111; font-weight: 900; font-size: 11px; padding: 3px 12px;
+    border-radius: 99px; letter-spacing: 1.2px; cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  }
+  .game-logo {
+    font-size: 36px; font-weight: 900; color: #fff; letter-spacing: 1px;
+    text-shadow: 0 4px 0 #0d47a1, 0 8px 18px rgba(0,0,0,0.45); margin-top: 2px;
+  }
+  .status-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+
+  /* FROSTED BOTTOM DOCK */
+  .bottom-dock {
+    width: 100%; max-width: 460px; background: rgba(14, 24, 48, 0.78);
+    backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 22px; padding: 10px 12px; display: flex; flex-direction: column;
+    gap: 8px; pointer-events: auto; box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  }
+  .selector-row { display: flex; gap: 6px; justify-content: center; }
+  .sel-btn {
+    flex: 1; padding: 7px 6px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1); color: #fff; font-weight: 800; font-size: 11px;
+    text-align: center; cursor: pointer; transition: 0.15s;
+  }
+  .sel-btn.active { background: linear-gradient(135deg, #00f2fe, #4facfe); color: #081226; border-color: #fff; box-shadow: 0 0 12px rgba(0,242,254,0.5); }
+  .play-btn {
+    width: 100%; padding: 13px; border-radius: 16px; border: none;
+    background: linear-gradient(135deg, #00e676, #00b0ff); color: #fff;
+    font-size: 19px; font-weight: 900; letter-spacing: 1px; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,230,118,0.45);
+  }
+  .dock-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .dock-item {
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px; padding: 7px 2px; text-align: center; color: #fff;
+    font-size: 11px; font-weight: 800; cursor: pointer;
+  }
+
+  /* IN-GAME HUD */
+  #hudOverlay {
+    position: absolute; inset: 52px 0 0 0; pointer-events: none;
+    display: none; flex-direction: column; justify-content: space-between; padding: 10px 14px;
+  }
+  .hud-top-bar { display: flex; justify-content: space-between; align-items: center; gap: 6px; pointer-events: auto; }
+  .score-big { font-size: 42px; font-weight: 900; color: #fff; text-align: center; text-shadow: 0 3px 10px rgba(0,0,0,0.45); }
+  #activeModeBadge {
+    align-self: center; background: rgba(15,23,42,0.85); color: #ffd700;
+    padding: 5px 14px; border-radius: 99px; font-weight: 900; font-size: 13px;
+    border: 1px solid #ffd700; margin-top: 4px;
+  }
+  .powerup-bar { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; pointer-events: auto; }
+
+  /* MODALS */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(6, 11, 25, 0.84);
+    backdrop-filter: blur(8px); z-index: 100; display: none;
+    align-items: center; justify-content: center; padding: 14px; pointer-events: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-card {
+    width: 100%; max-width: 440px; max-height: 88vh; background: #131d36;
+    border: 1.5px solid rgba(255,255,255,0.25); border-radius: 22px;
+    color: #fff; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.65);
+  }
+  .modal-header {
+    padding: 13px 16px; background: rgba(255,255,255,0.06);
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+  }
+  .modal-title { font-size: 17px; font-weight: 900; }
+  .close-btn {
+    background: rgba(255,255,255,0.14); border: none; color: #fff;
+    width: 30px; height: 30px; border-radius: 50%; font-weight: 900; cursor: pointer;
+  }
+  .modal-body { padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+
+  /* SHOP & SKINS */
+  .tab-row { display: flex; gap: 5px; margin-bottom: 6px; }
+  .tab-btn {
+    flex: 1; padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15); color: #fff; font-weight: 800; font-size: 11px; cursor: pointer;
+  }
+  .tab-btn.active { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #111; border-color: #fff; }
+  .skin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .skin-card {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 16px; padding: 10px; text-align: center; display: flex;
+    flex-direction: column; align-items: center; gap: 6px;
+  }
+  .skin-preview-box {
+    width: 84px; height: 84px; border-radius: 14px;
+    background: radial-gradient(circle at 35% 30%, #1e2d52, #090d1a);
+    border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;
+  }
+  .action-btn {
+    width: 100%; padding: 8px 10px; border-radius: 10px; border: none;
+    font-weight: 900; font-size: 12px; cursor: pointer;
+    background: linear-gradient(135deg, #00f2fe, #4facfe); color: #091326;
+  }
+  .action-btn.vip-btn { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #111; }
+  .action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  .compare-table th, .compare-table td { border: 1px solid rgba(255,255,255,0.15); padding: 6px 8px; text-align: center; }
+  .compare-table th { background: rgba(255,255,255,0.1); }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div class="ui-layer">
+  <!-- TOP HEADER -->
+  <div id="topHeaderZone" class="interactive">
+    <div class="header-left">
+      <div id="vipCrownPill" class="vip-crown-pill" title="VIP Club Active">👑</div>
+      <div class="pill" onclick="openShop('vip')">💎 <span id="diamondCount">15</span></div>
+      <div class="pill" onclick="openShop('boosts')">🛡️ <span id="shieldCount">1</span></div>
+    </div>
+    <div class="header-right">
+      <div class="pill" id="paletteBtn" onclick="cycleColorPair()">🎨 CYAN/PINK</div>
+      <div class="pill" id="stationBtn" onclick="cycleMusicStation()">🎧 Neon</div>
+      <div class="pill" id="muteBtn" onclick="toggleAudio()">🎵</div>
+    </div>
+  </div>
+
+  <!-- HOME OVERLAY -->
+  <div id="homeOverlay">
+    <div class="title-block">
+      <div class="studio-badge" onclick="openModal('creditsModal')">✨ LEF STUDIO</div>
+      <div class="game-logo">COLOR HOP!</div>
+      <div class="status-row">
+        <div class="pill" onclick="claimDailyGift()">🎁 <span id="dailyGiftLabel">Daily Gift</span></div>
+        <div class="pill pill-gold" onclick="openShop('vip')" id="homeVipBadge">👑 VIP $3.99</div>
+        <div class="pill" onclick="openShop('wheel')">🎡 <span id="homeWheelBadge">Spin Ready</span></div>
+      </div>
+    </div>
+
+    <div class="bottom-dock">
+      <!-- DIFFICULTY -->
+      <div class="selector-row">
+        <div class="sel-btn" id="diffEasy" onclick="setDifficulty('easy')">🟢 Easy 0.78x</div>
+        <div class="sel-btn active" id="diffMedium" onclick="setDifficulty('medium')">🟡 Med 0.90x</div>
+        <div class="sel-btn" id="diffHard" onclick="setDifficulty('hard')">🔴 Hard 1.00x</div>
+      </div>
+      <!-- GAME MODES -->
+      <div class="selector-row">
+        <div class="sel-btn active" id="modeEndless" onclick="setGameMode('endless')">♾️ Endless</div>
+        <div class="sel-btn" id="modeLevels" onclick="openModal('levelsModal')">🗺️ 20 Stages</div>
+        <div class="sel-btn" id="modeRace" onclick="setGameMode('race')">🏁 50-Tile Race</div>
+        <div class="sel-btn" id="practiceToggleBtn" onclick="togglePracticeMode()">💎 Practice: OFF</div>
+      </div>
+      <button class="play-btn" onclick="startGameRun()">▶ TAP TO HOP</button>
+      <div class="dock-grid">
+        <div class="dock-item" onclick="openShop('skins')">🛒 Shop</div>
+        <div class="dock-item" onclick="openShop('wheel')">🎡 Wheel</div>
+        <div class="dock-item" onclick="openModal('questsModal')">📋 Quests</div>
+        <div class="dock-item" onclick="openModal('passModal')">🎟️ Pass</div>
+        <div class="dock-item" onclick="openModal('leaderboardModal')">🏆 Ranks</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IN-GAME HUD -->
+  <div id="hudOverlay">
+    <div>
+      <div class="hud-top-bar">
+        <div class="pill" onclick="pauseToHome()">🏠 Exit</div>
+        <div class="pill" id="hudPracticePill" onclick="disablePracticeMidRun()" style="display:none;">💎 Practice: ON ✕</div>
+        <div class="pill" id="hudVipShieldPill" style="display:none;">👑 VIP Shield: READY</div>
+        <div class="pill" id="hudRaceRankPill" style="display:none;">🏁 1st / 3</div>
+      </div>
+      <div class="score-big" id="liveScoreText">0</div>
+      <div id="activeModeBadge">🟢 CLASSIC HOP</div>
+    </div>
+    <div class="powerup-bar">
+      <div class="pill" onclick="triggerColorSwap()">🔄 Swap Color (Space)</div>
+      <div class="pill" onclick="activateSlowMo()">❄️ Slow-Mo (<span id="slowMoCount">1</span>)</div>
+      <div class="pill" onclick="activateGemDoubler()">💎 2x Gems (<span id="doublerCount">1</span>)</div>
+    </div>
+  </div>
+</div>
+
+<!-- SHOP & VIP & WHEEL MODAL -->
+<div class="modal-backdrop" id="shopModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">🛒 Mega 3D Shop & VIP Club</div>
+      <button class="close-btn" onclick="closeModal('shopModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tab-row">
+        <button class="tab-btn active" id="tabBtn_skins" onclick="switchShopTab('skins')">⚽ Skins</button>
+        <button class="tab-btn" id="tabBtn_vip" onclick="switchShopTab('vip')">👑 VIP</button>
+        <button class="tab-btn" id="tabBtn_boosts" onclick="switchShopTab('boosts')">⚡ Boosts</button>
+        <button class="tab-btn" id="tabBtn_wheel" onclick="switchShopTab('wheel')">🎡 Wheel</button>
+      </div>
+      <div id="shopTabContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 20 LEVELS MODAL -->
+<div class="modal-backdrop" id="levelsModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">🗺️ 20 Campaign Stages</div>
+      <button class="close-btn" onclick="closeModal('levelsModal')">✕</button>
+    </div>
+    <div class="modal-body" id="levelsListBody"></div>
+  </div>
+</div>
+
+<!-- QUESTS MODAL -->
+<div class="modal-backdrop" id="questsModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">📋 Missions & Secret Achievement</div>
+      <button class="close-btn" onclick="closeModal('questsModal')">✕</button>
+    </div>
+    <div class="modal-body" id="questsBody"></div>
+  </div>
+</div>
+
+<!-- SEASON PASS MODAL -->
+<div class="modal-backdrop" id="passModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">🎟️ 30-Tier Season Pass</div>
+      <button class="close-btn" onclick="closeModal('passModal')">✕</button>
+    </div>
+    <div class="modal-body" id="passBody"></div>
+  </div>
+</div>
+
+<!-- LEADERBOARD MODAL (BLANK BY DEFAULT FOR LIVE BACKEND HOOK) -->
+<div class="modal-backdrop" id="leaderboardModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">🏆 Online Leaderboard</div>
+      <button class="close-btn" onclick="closeModal('leaderboardModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="leaderboardList" style="display:flex;flex-direction:column;gap:6px;min-height:140px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESPAWN / GAME OVER MODAL -->
+<div class="modal-backdrop" id="gameOverModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title" id="gameOverTitle">Run Complete!</div>
+      <button class="close-btn" onclick="pauseToHome()">✕</button>
+    </div>
+    <div class="modal-body" id="gameOverBody" style="text-align:center;"></div>
+  </div>
+</div>
+
+<!-- OFFICIAL STUDIO CREDITS MODAL -->
+<div class="modal-backdrop" id="creditsModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">✨ Official Studio Credits</div>
+      <button class="close-btn" onclick="closeModal('creditsModal')">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <h2 style="color:#ffd700;">LEF STUDIO</h2>
+      <p style="font-size:13px;opacity:0.85;">Official Creator & Publisher of Color Hop! 3D Arcade Edition.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const OFFICIAL_STUDIO_NAME = "LEF STUDIO";
+
+/* 18 DISTINCT 3D SKINS (Including VIP Royal Sovereign & Secret Omega Singularity) */
+const BALL_SKINS = [
+  { id: 'neon_core', name: 'Neon Core', cost: 0, color: '#00f2fe', accent: '#ffffff' },
+  { id: 'cyber_gold', name: 'Cyber Gold', cost: 40, color: '#ffd700', accent: '#ff8c00' },
+  { id: 'plasma_vortex', name: 'Plasma Vortex', cost: 55, color: '#b721ff', accent: '#21d4fd' },
+  { id: 'frost_crystal', name: 'Frost Crystal', cost: 65, color: '#80d8ff', accent: '#e1f5fe' },
+  { id: 'emerald_matrix', name: 'Emerald Matrix', cost: 75, color: '#00e676', accent: '#b9f6ca' },
+  { id: 'crimson_nova', name: 'Crimson Nova', cost: 85, color: '#ff1744', accent: '#ff8a80' },
+  { id: 'solar_flare', name: 'Solar Flare', cost: 95, color: '#ff9100', accent: '#fff176' },
+  { id: 'rainbow_prism', name: 'Rainbow Prism', cost: 110, color: '#ff4081', accent: '#00e5ff' },
+  { id: 'dragon_scale', name: 'Dragon Scale', cost: 125, color: '#d50000', accent: '#ffd600' },
+  { id: 'holo_mech', name: 'Holo Mech', cost: 135, color: '#00b0ff', accent: '#e0f7fa' },
+  { id: 'starlight_halo', name: 'Starlight Halo', cost: 150, color: '#fff59d', accent: '#ffd740' },
+  { id: 'angelic_wings', name: 'Angelic Wings', cost: 165, color: '#ffffff', accent: '#ffe57f' },
+  { id: 'demon_crown', name: 'Demon Crown', cost: 175, color: '#880e4f', accent: '#ffd700' },
+  { id: 'pixel_glitch', name: 'Pixel Glitch', cost: 190, color: '#00e5ff', accent: '#ff1744' },
+  { id: 'void_galaxy', name: 'Void Galaxy', cost: 210, color: '#311b92', accent: '#b388ff' },
+  { id: 'rainbow_infinity', name: 'Rainbow Infinity', cost: 240, color: '#7c4dff', accent: '#18ffff' },
+  { id: 'royal_sovereign', name: '👑 Royal Sovereign', cost: 0, vipOnly: true, color: '#6a1b9a', accent: '#ffd700' },
+  { id: 'omega_singularity', name: '🌌 Omega Singularity', cost: 0, secretOnly: true, color: '#0d0221', accent: '#00f2fe' }
+];
+
+const COLOR_PAIRS = [
+  { name: 'CYAN/PINK', c0: '#00f2fe', c1: '#ff0844' },
+  { name: 'GOLD/PURPLE', c0: '#ffd700', c1: '#9b51e0' },
+  { name: 'LIME/ORANGE', c0: '#00e676', c1: '#ff6d00' }
+];
+
+const RUN_MODES = [
+  { id: 'normal', label: '🟢 CLASSIC HOP' },
+  { id: 'upside_down', label: '🙃 UPSIDE-DOWN' },
+  { id: 'rocket', label: '🚀 ROCKET JET' },
+  { id: 'wave', label: '⚡ ZIG-ZAG WAVE' },
+  { id: 'zerog', label: '🎈 ZERO-G MOON' },
+  { id: 'tilt', label: '🎡 BARREL TILT' },
+  { id: 'mini', label: '🔮 MINI TURBO' }
+];
+
+/* PERSISTENT SAVE DATA */
+let saveData = JSON.parse(localStorage.getItem('colorHop_lefStudio_v1') || 'null') || {
+  diamonds: 15,
+  shields: 1,
+  slowMo: 1,
+  gemDoubler: 1,
+  vip: false,
+  bestScore: 0,
+  equippedSkin: 'neon_core',
+  unlockedSkins: ['neon_core'],
+  levelClears: {},
+  passXp: 0,
+  lastDailyGiftDate: '',
+  lastFreeSpinDate: '',
+  lastAdSpinDate: '',
+  dailyAdSpinsUsed: 0
+};
+
+function saveGame() {
+  localStorage.setItem('colorHop_lefStudio_v1', JSON.stringify(saveData));
+  updateTopHeaderUI();
+}
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getRemainingAdSpinsToday() {
+  const today = getTodayKey();
+  if (saveData.lastAdSpinDate !== today) {
+    saveData.lastAdSpinDate = today;
+    saveData.dailyAdSpinsUsed = 0;
+  }
+  return Math.max(0, 2 - (saveData.dailyAdSpinsUsed || 0));
+}
+
+/* NATIVE HOOKS FOR ADMOB, PLAY BILLING & LIVE LEADERBOARD */
+window._pendingAdCallback = null;
+window.onRewardedAdComplete = function() {
+  if (typeof window._pendingAdCallback === 'function') {
+    const cb = window._pendingAdCallback;
+    window._pendingAdCallback = null;
+    cb();
+  }
+};
+
+function openRewardedAd(reason, onComplete) {
+  if (saveData.vip) {
+    onComplete();
+    return;
+  }
+  window._pendingAdCallback = onComplete;
+  if (window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd === 'function') {
+    window.AndroidBridge.showRewardedAd(reason);
+  } else {
+    // Ready for real AdMob SDK callback via window.onRewardedAdComplete()
+    console.log("AdMob hook triggered for:", reason, "— call window.onRewardedAdComplete() from Android SDK.");
+  }
+}
+
+window.completeVipActivation = function() {
+  if (saveData.vip) return;
+  saveData.vip = true;
+  saveData.diamonds += 150;
+  saveData.shields += 3;
+  if (!saveData.unlockedSkins.includes('royal_sovereign')) {
+    saveData.unlockedSkins.push('royal_sovereign');
+  }
+  saveData.equippedSkin = 'royal_sovereign';
+  saveGame();
+  renderShopModal();
+};
+
+window.onGooglePlayVipPurchaseSuccess = function() {
+  window.completeVipActivation();
+};
+
+function buyVip() {
+  if (saveData.vip) return;
+  if (window.AndroidBridge && typeof window.AndroidBridge.purchaseVIP === 'function') {
+    window.AndroidBridge.purchaseVIP('vip_pass_399');
+  } else {
+    window.completeVipActivation();
+  }
+}
+
+window.onlineLeaderboardEntries = [];
+window.setOnlineLeaderboard = function(entries) {
+  window.onlineLeaderboardEntries = Array.isArray(entries) ? entries : [];
+  renderLeaderboardModal();
+};
+
+/* AUDIO SYNTHESIZER (3 EDM STATIONS) */
+const STATIONS = [
+  { name: 'Neon', bpm: 128, notes: [261.63, 329.63, 392.00, 523.25] },
+  { name: 'Cyber', bpm: 136, notes: [293.66, 349.23, 440.00, 587.33] },
+  { name: 'Chroma', bpm: 122, notes: [246.94, 311.13, 369.99, 493.88] }
+];
+let stationIdx = 0;
+let audioMuted = false;
+let audioCtx = null;
+
+function playHopSynth(pitchMult = 1) {
+  if (audioMuted) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const baseList = STATIONS[stationIdx].notes;
+    const freq = baseList[gameState.score % baseList.length] * pitchMult;
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.16);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.16);
+  } catch (e) {}
+}
+
+function cycleMusicStation() {
+  stationIdx = (stationIdx + 1) % STATIONS.length;
+  document.getElementById('stationBtn').textContent = '🎧 ' + STATIONS[stationIdx].name;
+}
+
+function toggleAudio() {
+  audioMuted = !audioMuted;
+  document.getElementById('muteBtn').textContent = audioMuted ? '🔇' : '🎵';
+}
+
+/* GAME ENGINE & 3D RUNWAY STATE */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let pairIdx = 0;
+let difficultyMult = 0.90;
+let currentShopTab = 'skins';
+
+const gameState = {
+  phase: 'HOME', // HOME | PLAYING | COUNTDOWN
+  mode: 'endless', // endless | level | race
+  activeLevel: 1,
+  practice: false,
+  runMode: 'normal',
+  cameraZ: 0,
+  hopProgress: 0,
+  ballX: 0,
+  ballColorIdx: 0,
+  score: 0,
+  targetX: 0,
+  tiles: [],
+  vipShieldActive: false,
+  slowMoTimer: 0,
+  gemDoublerActive: false,
+  inversionLerp: 0,
+  tiltAngle: 0,
+  rivals: [
+    { name: 'NovaBot', z: 0, speed: 0.92, color: '#ff9100' },
+    { name: 'TurboOrb', z: 0, speed: 0.97, color: '#b388ff' }
+  ]
+};
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function buildRunwayTiles(count = 160) {
+  gameState.tiles = [];
+  for (let i = 0; i < count; i++) {
+    const laneX = i < 3 ? 0 : (Math.sin(i * 0.65) * 0.55 + (Math.random() - 0.5) * 0.5);
+    const colorIdx = i === 0 ? 0 : (Math.random() < 0.5 ? 0 : 1);
+    const hasPortal = i >= 7 && i % 10 === 0;
+    const hasGem = !hasPortal && i > 3 && i % 11 === 0;
+    gameState.tiles.push({
+      index: i,
+      laneX: Math.max(-0.85, Math.min(0.85, laneX)),
+      colorIdx,
+      hasPortal,
+      hasGem,
+      gemTaken: false,
+      bounce: 0
+    });
+  }
+}
+buildRunwayTiles();
+
+/* CONTROLS */
+let pointerDown = false;
+window.addEventListener('pointerdown', (e) => {
+  if (gameState.phase !== 'PLAYING') return;
+  if (e.target.closest('.interactive') || e.target.closest('.hud-top-bar') || e.target.closest('.powerup-bar')) return;
+  pointerDown = true;
+  updatePointerSteer(e.clientX);
+});
+window.addEventListener('pointermove', (e) => {
+  if (!pointerDown || gameState.phase !== 'PLAYING') return;
+  updatePointerSteer(e.clientX);
+});
+window.addEventListener('pointerup', () => { pointerDown = false; });
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && gameState.phase === 'PLAYING') triggerColorSwap();
+  if (e.code === 'ArrowLeft') gameState.targetX = Math.max(-1, gameState.targetX - 0.28);
+  if (e.code === 'ArrowRight') gameState.targetX = Math.min(1, gameState.targetX + 0.28);
+});
+
+function updatePointerSteer(clientX) {
+  const norm = ((clientX / window.innerWidth) - 0.5) * 2.2;
+  gameState.targetX = Math.max(-1, Math.min(1, norm));
+}
+
+function triggerColorSwap() {
+  if (gameState.phase !== 'PLAYING') return;
+  gameState.ballColorIdx = 1 - gameState.ballColorIdx;
+  playHopSynth(1.25);
+}
+
+function activateSlowMo() {
+  if (saveData.slowMo <= 0 || gameState.slowMoTimer > 0) return;
+  saveData.slowMo--;
+  gameState.slowMoTimer = 300;
+  saveGame();
+}
+
+function activateGemDoubler() {
+  if (saveData.gemDoubler <= 0 || gameState.gemDoublerActive) return;
+  saveData.gemDoubler--;
+  gameState.gemDoublerActive = true;
+  saveGame();
+}
+
+function cycleColorPair() {
+  pairIdx = (pairIdx + 1) % COLOR_PAIRS.length;
+  document.getElementById('paletteBtn').textContent = '🎨 ' + COLOR_PAIRS[pairIdx].name;
+}
+
+function setDifficulty(level) {
+  difficultyMult = level === 'easy' ? 0.78 : (level === 'medium' ? 0.90 : 1.00);
+  document.getElementById('diffEasy').classList.toggle('active', level === 'easy');
+  document.getElementById('diffMedium').classList.toggle('active', level === 'medium');
+  document.getElementById('diffHard').classList.toggle('active', level === 'hard');
+}
+
+function setGameMode(m) {
+  gameState.mode = m;
+  document.getElementById('modeEndless').classList.toggle('active', m === 'endless');
+  document.getElementById('modeRace').classList.toggle('active', m === 'race');
+}
+
+function togglePracticeMode() {
+  gameState.practice = !gameState.practice;
+  const btn = document.getElementById('practiceToggleBtn');
+  btn.textContent = gameState.practice ? '💎 Practice: ON' : '💎 Practice: OFF';
+  btn.classList.toggle('active', gameState.practice);
+}
+
+function disablePracticeMidRun() {
+  gameState.practice = false;
+  document.getElementById('hudPracticePill').style.display = 'none';
+  togglePracticeMode();
+}
+
+function startGameRun(customLevel = null) {
+  if (customLevel !== null) {
+    gameState.mode = 'level';
+    gameState.activeLevel = customLevel;
+    closeModal('levelsModal');
+  }
+  buildRunwayTiles(220);
+  gameState.phase = 'PLAYING';
+  gameState.runMode = 'normal';
+  gameState.cameraZ = 0;
+  gameState.hopProgress = 0;
+  gameState.score = 0;
+  gameState.ballX = gameState.tiles[0].laneX;
+  gameState.targetX = gameState.ballX;
+  gameState.ballColorIdx = gameState.tiles[0].colorIdx;
+  gameState.vipShieldActive = saveData.vip;
+  gameState.slowMoTimer = 0;
+  gameState.gemDoublerActive = false;
+  gameState.rivals[0].z = 0;
+  gameState.rivals[1].z = 0;
+
+  document.getElementById('homeOverlay').style.display = 'none';
+  document.getElementById('hudOverlay').style.display = 'flex';
+  document.getElementById('hudPracticePill').style.display = gameState.practice ? 'inline-flex' : 'none';
+  document.getElementById('hudVipShieldPill').style.display = gameState.vipShieldActive ? 'inline-flex' : 'none';
+  document.getElementById('hudRaceRankPill').style.display = gameState.mode === 'race' ? 'inline-flex' : 'none';
+  document.getElementById('liveScoreText').textContent = '0';
+  document.getElementById('activeModeBadge').textContent = '🟢 CLASSIC HOP';
+}
+
+function pauseToHome() {
+  closeModal('gameOverModal');
+  gameState.phase = 'HOME';
+  gameState.runMode = 'normal';
+  gameState.cameraZ = 0;
+  gameState.hopProgress = 0;
+  document.getElementById('hudOverlay').style.display = 'none';
+  document.getElementById('homeOverlay').style.display = 'flex';
+  saveGame();
+}
+
+function activateRandomRunMode() {
+  const candidates = RUN_MODES.filter(m => m.id !== gameState.runMode);
+  const picked = candidates[Math.floor(Math.random() * candidates.length)];
+  gameState.runMode = picked.id;
+  document.getElementById('activeModeBadge').textContent = picked.label;
+}
+
+/* 3D BALL SKIN RENDERER (USED IN RUNWAY & SHOP PREVIEWS) */
+function draw3DBallSkin(targetCtx, cx, cy, r, skinId, activeHueColor, tick) {
+  const skin = BALL_SKINS.find(s => s.id === skinId) || BALL_SKINS[0];
+  targetCtx.save();
+
+  // Base 3D Sphere Gradient
+  const grad = targetCtx.createRadialGradient(cx - r * 0.32, cy - r * 0.32, r * 0.12, cx, cy, r);
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.35, activeHueColor || skin.color);
+  grad.addColorStop(1, '#081026');
+  targetCtx.fillStyle = grad;
+  targetCtx.beginPath();
+  targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
+  targetCtx.fill();
+
+  // Outer Accent Aura Ring
+  targetCtx.strokeStyle = skin.accent;
+  targetCtx.lineWidth = Math.max(1.5, r * 0.1);
+  targetCtx.beginPath();
+  targetCtx.arc(cx, cy, r * 0.72, tick * 0.04, tick * 0.04 + Math.PI * 1.4);
+  targetCtx.stroke();
+
+  // Special Geometry for VIP Royal Sovereign & Secret Omega Singularity
+  if (skinId === 'royal_sovereign' || skinId === 'demon_crown' || skinId === 'starlight_halo') {
+    targetCtx.fillStyle = '#ffd700';
+    targetCtx.beginPath();
+    targetCtx.moveTo(cx - r * 0.45, cy - r * 0.85);
+    targetCtx.lineTo(cx - r * 0.2, cy - r * 1.25);
+    targetCtx.lineTo(cx, cy - r * 0.95);
+    targetCtx.lineTo(cx + r * 0.2, cy - r * 1.25);
+    targetCtx.lineTo(cx + r * 0.45, cy - r * 0.85);
+    targetCtx.closePath();
+    targetCtx.fill();
+  } else if (skinId === 'omega_singularity') {
+    targetCtx.strokeStyle = '#00f2fe';
+    targetCtx.lineWidth = 2;
+    for (let k = 0; k < 3; k++) {
+      targetCtx.beginPath();
+      targetCtx.ellipse(cx, cy, r * 1.15, r * 0.38, (tick * 0.03) + k * 1.05, 0, Math.PI * 2);
+      targetCtx.stroke();
+    }
+  }
+  targetCtx.restore();
+}
+
+/* 3D PERSPECTIVE PROJECTION */
+function project3D(laneX, tileZ, yOffset = 0) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const relZ = Math.max(0.15, tileZ - gameState.cameraZ);
+  const horizonY = gameState.phase === 'HOME' ? h * 0.37 : h * 0.33;
+  const groundSpan = h * 0.52;
+  const scale = 1 / (1 + relZ * 0.36);
+  const screenX = w * 0.5 + laneX * (w * 0.42) * scale;
+  let screenY = horizonY + groundSpan * scale - yOffset * scale;
+
+  // Upside-down runway inversion
+  if (gameState.inversionLerp > 0.01) {
+    const invertedY = h - screenY;
+    screenY = screenY * (1 - gameState.inversionLerp) + invertedY * gameState.inversionLerp;
+  }
+  return { x: screenX, y: screenY, scale };
+}
+
+/* UPDATE & RENDER LOOP */
+let tickCount = 0;
+function updateAndRender() {
+  tickCount++;
+  const pair = COLOR_PAIRS[pairIdx];
+
+  // Smooth mode transitions
+  const targetInv = gameState.runMode === 'upside_down' ? 1 : 0;
+  gameState.inversionLerp += (targetInv - gameState.inversionLerp) * 0.1;
+
+  if (gameState.phase === 'HOME') {
+    // Platform-locked Lobby Hopping
+    const hopSpeed = 0.032;
+    gameState.hopProgress += hopSpeed;
+    const currIdx = Math.floor(gameState.cameraZ);
+    if (gameState.hopProgress >= 1) {
+      gameState.hopProgress = 0;
+      gameState.cameraZ = currIdx + 1;
+      if (gameState.cameraZ > 90) {
+        buildRunwayTiles();
+        gameState.cameraZ = 0;
+      }
+      const landed = gameState.tiles[Math.floor(gameState.cameraZ)];
+      if (landed) {
+        landed.bounce = 1;
+        gameState.ballColorIdx = landed.colorIdx;
+      }
+    }
+    const cTile = gameState.tiles[Math.floor(gameState.cameraZ)] || gameState.tiles[0];
+    const nTile = gameState.tiles[Math.floor(gameState.cameraZ) + 1] || cTile;
+    gameState.ballX = cTile.laneX + (nTile.laneX - cTile.laneX) * gameState.hopProgress;
+    gameState.cameraZ = Math.floor(gameState.cameraZ) + gameState.hopProgress;
+  } else if (gameState.phase === 'PLAYING') {
+    const slowFactor = gameState.slowMoTimer > 0 ? 0.58 : 1;
+    if (gameState.slowMoTimer > 0) gameState.slowMoTimer--;
+    const rocketBoost = gameState.runMode === 'rocket' ? 1.12 : 1;
+    const step = 0.044 * difficultyMult * slowFactor * rocketBoost;
+
+    const prevTileIdx = Math.floor(gameState.cameraZ);
+    gameState.cameraZ += step;
+    gameState.hopProgress = gameState.cameraZ % 1;
+    gameState.ballX += (gameState.targetX - gameState.ballX) * 0.22;
+
+    if (gameState.mode === 'race') {
+      gameState.rivals.forEach(r => { r.z += step * r.speed; });
+      const rank = 1 + gameState.rivals.filter(r => r.z > gameState.cameraZ).length;
+      document.getElementById('hudRaceRankPill').textContent = `🏁 ${rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'} / 3`;
+    }
+
+    const currTileIdx = Math.floor(gameState.cameraZ);
+    if (currTileIdx > prevTileIdx) {
+      const tile = gameState.tiles[currTileIdx];
+      if (!tile) {
+        buildRunwayTiles(gameState.tiles.length + 80);
+      } else {
+        const waveOffset = gameState.runMode === 'wave' ? Math.sin(tickCount * 0.08 + currTileIdx) * 0.18 : 0;
+        const dist = Math.abs(gameState.ballX - (tile.laneX + waveOffset));
+        const colorMatch = gameState.ballColorIdx === tile.colorIdx;
+
+        if (dist > 0.34 || !colorMatch) {
+          if (colorMatch === false && dist <= 0.34 && gameState.vipShieldActive) {
+            gameState.vipShieldActive = false;
+            document.getElementById('hudVipShieldPill').style.display = 'none';
+            gameState.ballColorIdx = tile.colorIdx;
+          } else if (colorMatch === false && dist <= 0.34 && saveData.shields > 0) {
+            saveData.shields--;
+            saveGame();
+            gameState.ballColorIdx = tile.colorIdx;
+          } else {
+            handleRunCrash(currTileIdx);
+            return;
+          }
+        }
+
+        // Valid landing
+        tile.bounce = 1;
+        gameState.score++;
+        document.getElementById('liveScoreText').textContent = gameState.score;
+        playHopSynth();
+
+        if (tile.hasGem && !tile.gemTaken) {
+          tile.gemTaken = true;
+          const baseGem = saveData.vip ? 2 : 1;
+          saveData.diamonds += gameState.gemDoublerActive ? baseGem * 2 : baseGem;
+          saveGame();
+        }
+        if (tile.hasPortal) {
+          activateRandomRunMode();
+        }
+
+        // Check Level or 50-Tile Race completion
+        const targetGoal = gameState.mode === 'race' ? 50 : (gameState.mode === 'level' ? 18 + gameState.activeLevel * 2 : 999999);
+        if (gameState.score >= targetGoal) {
+          handleRunVictory();
+          return;
+        }
+      }
+    }
+  }
+
+  /* RENDER SKY & RUNWAY */
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, '#1899e8');
+  sky.addColorStop(0.58, '#4ec5f7');
+  sky.addColorStop(1, '#e5f7c8');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const startIdx = Math.max(0, Math.floor(gameState.cameraZ) - 1);
+  const endIdx = Math.min(gameState.tiles.length - 1, startIdx + 24);
+
+  for (let i = endIdx; i >= startIdx; i--) {
+    const t = gameState.tiles[i];
+    if (t.bounce > 0) t.bounce = Math.max(0, t.bounce - 0.08);
+    const waveX = gameState.runMode === 'wave' ? Math.sin(tickCount * 0.08 + i) * 0.18 : 0;
+    const p = project3D(t.laneX + waveX, i, -t.bounce * 8);
+    const tileW = 135 * p.scale;
+    const tileH = 34 * p.scale;
+    const tColor = t.colorIdx === 0 ? pair.c0 : pair.c1;
+
+    // 3D Platform Extrusion & Top Face
+    ctx.fillStyle = '#0c162d';
+    ctx.fillRect(p.x - tileW * 0.5, p.y - tileH * 0.5 + 8 * p.scale, tileW, tileH);
+    ctx.fillStyle = tColor;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1, 2 * p.scale);
+    ctx.beginPath();
+    ctx.roundRect(p.x - tileW * 0.5, p.y - tileH * 0.5, tileW, tileH, 8 * p.scale);
+    ctx.fill();
+    ctx.stroke();
+
+    // Random Mode Portal Gate
+    if (t.hasPortal) {
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = Math.max(2, 4 * p.scale);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - 26 * p.scale, 36 * p.scale, Math.PI, 0);
+      ctx.stroke();
+    }
+
+    // Floating Diamond
+    if (t.hasGem && !t.gemTaken) {
+      ctx.fillStyle = '#00f2fe';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - 24 * p.scale, 10 * p.scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  /* RENDER BALL FLUSH ON PLATFORM */
+  const hopArc = gameState.runMode === 'rocket' ? 18 : Math.sin(gameState.hopProgress * Math.PI) * (gameState.runMode === 'zerog' ? 95 : 64);
+  const ballProj = project3D(gameState.ballX, gameState.cameraZ, hopArc);
+  const sizeMult = gameState.runMode === 'mini' ? 0.58 : 1;
+  const ballRadius = Math.max(10, 26 * ballProj.scale * sizeMult);
+  const invDir = gameState.inversionLerp > 0.5 ? -1 : 1;
+  const orbCenterY = ballProj.y - invDir * (ballRadius * 0.92);
+
+  // Surface Contact Shadow
+  const groundProj = project3D(gameState.ballX, gameState.cameraZ, 0);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(groundProj.x, groundProj.y, ballRadius * 0.95, ballRadius * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const ballHue = gameState.ballColorIdx === 0 ? pair.c0 : pair.c1;
+  draw3DBallSkin(ctx, ballProj.x, orbCenterY, ballRadius, saveData.equippedSkin, ballHue, tickCount);
+
+  requestAnimationFrame(updateAndRender);
+}
+
+function handleRunCrash(tileIdx) {
+  if (gameState.practice) {
+    // Respawn on current tile in Practice Mode
+    const safeTile = gameState.tiles[tileIdx] || gameState.tiles[0];
+    gameState.ballX = safeTile.laneX;
+    gameState.targetX = safeTile.laneX;
+    gameState.ballColorIdx = safeTile.colorIdx;
+    return;
+  }
+  gameState.phase = 'COUNTDOWN';
+  if (gameState.score > saveData.bestScore) saveData.bestScore = gameState.score;
+  saveData.passXp += (saveData.vip ? 20 : 10);
+  saveGame();
+
+  document.getElementById('gameOverTitle').textContent = '💥 Missed Tile!';
+  document.getElementById('gameOverBody').innerHTML = `
+    <div style="font-size:32px;font-weight:900;">Score: ${gameState.score}</div>
+    <div style="font-size:13px;opacity:0.8;">Best Score: ${saveData.bestScore}</div>
+    <button class="action-btn vip-btn" onclick="reviveCurrentRun()">🎬 Watch Ad to Revive + 🛡️ Shield</button>
+    <button class="action-btn" onclick="startGameRun()">🔄 Play Again</button>
+    <button class="action-btn" style="background:rgba(255,255,255,0.15);color:#fff;" onclick="pauseToHome()">🏠 Exit to Home</button>
+  `;
+  openModal('gameOverModal');
+}
+
+function reviveCurrentRun() {
+  openRewardedAd('revive_run', () => {
+    closeModal('gameOverModal');
+    const idx = Math.floor(gameState.cameraZ);
+    const tile = gameState.tiles[idx] || gameState.tiles[0];
+    gameState.ballX = tile.laneX;
+    gameState.targetX = tile.laneX;
+    gameState.ballColorIdx = tile.colorIdx;
+    gameState.phase = 'PLAYING';
+  });
+}
+
+function handleRunVictory() {
+  gameState.phase = 'COUNTDOWN';
+  const baseReward = gameState.mode === 'race' ? 5 : 6;
+  const finalReward = saveData.vip ? baseReward * 2 : baseReward;
+  saveData.diamonds += finalReward;
+
+  if (gameState.mode === 'level' && !gameState.practice) {
+    const k = 'lvl_' + gameState.activeLevel;
+    saveData.levelClears[k] = (saveData.levelClears[k] || 0) + 1;
+    // Check Secret Achievement (3x clears across all 20 stages)
+    let all3x = true;
+    for (let s = 1; s <= 20; s++) {
+      if ((saveData.levelClears['lvl_' + s] || 0) < 3) all3x = false;
+    }
+    if (all3x && !saveData.unlockedSkins.includes('omega_singularity')) {
+      saveData.unlockedSkins.push('omega_singularity');
+    }
+  }
+  saveGame();
+
+  document.getElementById('gameOverTitle').textContent = '🏆 Stage Victory!';
+  document.getElementById('gameOverBody').innerHTML = `
+    <div style="font-size:26px;font-weight:900;color:#ffd700;">+${finalReward} 💎 Earned ${saveData.vip ? '(👑 VIP 2x)' : ''}</div>
+    <button class="action-btn" onclick="pauseToHome()">🏠 Continue</button>
+  `;
+  openModal('gameOverModal');
+}
+
+/* MODALS & SHOP RENDERING */
+function openModal(id) {
+  if (id === 'levelsModal') renderLevelsModal();
+  if (id === 'questsModal') renderQuestsModal();
+  if (id === 'passModal') renderPassModal();
+  if (id === 'leaderboardModal') renderLeaderboardModal();
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function openShop(tab = 'skins') {
+  currentShopTab = tab;
+  openModal('shopModal');
+  switchShopTab(tab);
+}
+
+function switchShopTab(tab) {
+  currentShopTab = tab;
+  ['skins', 'vip', 'boosts', 'wheel'].forEach(t => {
+    document.getElementById('tabBtn_' + t).classList.toggle('active', t === tab);
+  });
+  renderShopModal();
+}
+
+function renderShopModal() {
+  const box = document.getElementById('shopTabContent');
+  const discount = saveData.vip ? 0.75 : 1;
+
+  if (currentShopTab === 'skins') {
+    let html = `<div class="skin-grid">`;
+    BALL_SKINS.forEach(s => {
+      const unlocked = saveData.unlockedSkins.includes(s.id);
+      const equipped = saveData.equippedSkin === s.id;
+      const price = Math.round(s.cost * discount);
+      let btnHtml = '';
+      if (equipped) {
+        btnHtml = `<button class="action-btn" disabled>✅ EQUIPPED</button>`;
+      } else if (unlocked) {
+        btnHtml = `<button class="action-btn" onclick="equipSkin('${s.id}')">EQUIP</button>`;
+      } else if (s.vipOnly) {
+        btnHtml = `<button class="action-btn vip-btn" onclick="switchShopTab('vip')">👑 VIP EXCLUSIVE</button>`;
+      } else if (s.secretOnly) {
+        btnHtml = `<button class="action-btn" disabled>🔒 SECRET QUEST</button>`;
+      } else {
+        btnHtml = `<button class="action-btn" onclick="buySkin('${s.id}', ${price})">BUY ${price} 💎</button>`;
+      }
+      html += `
+        <div class="skin-card">
+          <div class="skin-preview-box">
+            <canvas class="skin-preview-canvas" data-skin="${s.id}" width="76" height="76"></canvas>
+          </div>
+          <div style="font-weight:900;font-size:12px;">${s.name}</div>
+          ${btnHtml}
+        </div>`;
+    });
+    html += `</div>`;
+    box.innerHTML = html;
+    paintAllShopSkinCanvases();
+  } else if (currentShopTab === 'vip') {
+    box.innerHTML = `
+      <div style="text-align:center;padding:8px;background:rgba(255,215,0,0.1);border:1px solid #ffd700;border-radius:16px;">
+        <div class="skin-preview-box" style="margin:0 auto 8px;">
+          <canvas class="skin-preview-canvas" data-skin="royal_sovereign" width="76" height="76"></canvas>
+        </div>
+        <h3 style="color:#ffd700;">👑 VIP CLUB PASS — $3.99</h3>
+        <p style="font-size:12px;margin:4px 0 8px;">Instant +150 💎 Welcome Bonus, +3 🛡️ Shields, 👑 Royal Sovereign 3D Skin, 2x Diamonds & Regenerating VIP Auto-Shield every run!</p>
+        ${saveData.vip
+          ? `<button class="action-btn vip-btn" disabled>👑 VIP CLUB ACTIVE</button>`
+          : `<button class="action-btn vip-btn" onclick="buyVip()">👑 BUY VIP CLUB PASS — $3.99 (+150 💎 BONUS!)</button>`}
+        <table class="compare-table">
+          <tr><th>Benefit</th><th>Free</th><th>👑 VIP ($3.99)</th></tr>
+          <tr><td>Runway & Stage Gems</td><td>1x</td><td>2x Diamonds</td></tr>
+          <tr><td>Auto-Shield Every Run</td><td>—</td><td>👑 Regenerating</td></tr>
+          <tr><td>Daily Gift & Spins</td><td>10 💎 / 1 Spin</td><td>30 💎 / 3 Spins</td></tr>
+          <tr><td>Shop Prices</td><td>100%</td><td>25% OFF</td></tr>
+        </table>
+      </div>`;
+    paintAllShopSkinCanvases();
+  } else if (currentShopTab === 'boosts') {
+    const sCost = Math.round(12 * discount);
+    box.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="action-btn" onclick="buyBoost('shields', ${sCost})">🛡️ Buy +1 Shield (${sCost} 💎)</button>
+        <button class="action-btn" onclick="buyBoost('slowMo', ${sCost})">❄️ Buy +1 Slow-Mo (${sCost} 💎)</button>
+        <button class="action-btn" onclick="buyBoost('gemDoubler', ${sCost})">💎 Buy +1 2x Gem Doubler (${sCost} 💎)</button>
+        <button class="action-btn vip-btn" onclick="watchAdForGems()">🎬 Watch Ad (+5 💎)</button>
+      </div>`;
+  } else if (currentShopTab === 'wheel') {
+    const today = getTodayKey();
+    const freeLeft = saveData.lastFreeSpinDate !== today;
+    const adLeft = getRemainingAdSpinsToday();
+    const spinCost = Math.round(15 * discount);
+    box.innerHTML = `
+      <div style="text-align:center;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:15px;font-weight:900;">🎡 8-Slice Weighted Lucky Wheel</div>
+        <div id="wheelResultText" style="font-size:14px;color:#ffd700;min-height:20px;">Spin for Diamonds, Shields & Boosts!</div>
+        ${freeLeft
+          ? `<button class="action-btn vip-btn" onclick="spinWheel('free')">🎡 USE DAILY FREE SPIN</button>`
+          : (adLeft > 0
+              ? `<button class="action-btn vip-btn" onclick="spinWheel('ad')">🎬 WATCH AD FOR SPIN (${adLeft}/2 LEFT)</button>`
+              : `<button class="action-btn" disabled>🎬 AD SPINS USED (0/2)</button>`)}
+        <button class="action-btn" onclick="spinWheel('gems', ${spinCost})">💎 Fast Spin (${spinCost} 💎)</button>
+      </div>`;
+  }
+}
+
+function paintAllShopSkinCanvases() {
+  document.querySelectorAll('.skin-preview-canvas').forEach(c => {
+    const sId = c.getAttribute('data-skin');
+    const cCtx = c.getContext('2d');
+    cCtx.clearRect(0, 0, c.width, c.height);
+    draw3DBallSkin(cCtx, c.width / 2, c.height / 2 + 4, 26, sId, null, tickCount);
+  });
+}
+
+function equipSkin(id) {
+  saveData.equippedSkin = id;
+  saveGame();
+  renderShopModal();
+}
+
+function buySkin(id, price) {
+  if (saveData.diamonds < price) return;
+  saveData.diamonds -= price;
+  saveData.unlockedSkins.push(id);
+  saveData.equippedSkin = id;
+  saveGame();
+  renderShopModal();
+}
+
+function buyBoost(key, cost) {
+  if (saveData.diamonds < cost) return;
+  saveData.diamonds -= cost;
+  saveData[key]++;
+  saveGame();
+}
+
+function watchAdForGems() {
+  openRewardedAd('shop_5_gems', () => {
+    saveData.diamonds += 5;
+    saveGame();
+  });
+}
+
+function spinWheel(type, cost = 15) {
+  const executeSpin = () => {
+    const prizes = [
+      { label: '+5 💎 Diamonds', apply: () => saveData.diamonds += 5 },
+      { label: '+10 💎 Diamonds', apply: () => saveData.diamonds += 10 },
+      { label: '+1 🛡️ Shield', apply: () => saveData.shields += 1 },
+      { label: '+1 ❄️ Slow-Mo', apply: () => saveData.slowMo += 1 },
+      { label: '+25 💎 Jackpot!', apply: () => saveData.diamonds += 25 }
+    ];
+    const picked = prizes[Math.floor(Math.random() * prizes.length)];
+    picked.apply();
+    saveGame();
+    renderShopModal();
+    const resEl = document.getElementById('wheelResultText');
+    if (resEl) resEl.textContent = '🎉 You Won: ' + picked.label;
+  };
+
+  if (type === 'free') {
+    saveData.lastFreeSpinDate = getTodayKey();
+    executeSpin();
+  } else if (type === 'ad') {
+    if (getRemainingAdSpinsToday() <= 0) return;
+    openRewardedAd('wheel_spin', () => {
+      saveData.dailyAdSpinsUsed = (saveData.dailyAdSpinsUsed || 0) + 1;
+      saveData.lastAdSpinDate = getTodayKey();
+      executeSpin();
+    });
+  } else if (type === 'gems') {
+    if (saveData.diamonds < cost) return;
+    saveData.diamonds -= cost;
+    executeSpin();
+  }
+}
+
+function claimDailyGift() {
+  const today = getTodayKey();
+  if (saveData.lastDailyGiftDate === today) return;
+  saveData.lastDailyGiftDate = today;
+  saveData.diamonds += saveData.vip ? 30 : 10;
+  saveGame();
+}
+
+function renderLevelsModal() {
+  let html = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">`;
+  for (let i = 1; i <= 20; i++) {
+    const clears = saveData.levelClears['lvl_' + i] || 0;
+    html += `<button class="action-btn" onclick="startGameRun(${i})">Stage ${i}<br><span style="font-size:10px;">⭐ ${clears}/3</span></button>`;
+  }
+  html += `</div>`;
+  document.getElementById('levelsListBody').innerHTML = html;
+}
+
+function renderQuestsModal() {
+  let completedStages = 0;
+  for (let i = 1; i <= 20; i++) {
+    if ((saveData.levelClears['lvl_' + i] || 0) >= 3) completedStages++;
+  }
+  document.getElementById('questsBody').innerHTML = `
+    <div style="padding:10px;background:rgba(255,255,255,0.06);border-radius:12px;">
+      <div style="font-weight:900;color:#00f2fe;">🌌 Secret Achievement: Omega Singularity</div>
+      <div style="font-size:12px;margin-top:4px;">Clear all 20 Campaign Stages 3x in Normal Mode (${completedStages}/20 stages completed).</div>
+    </div>`;
+}
+
+function renderPassModal() {
+  const tier = Math.min(30, Math.floor(saveData.passXp / 50) + 1);
+  document.getElementById('passBody').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div><strong>Current Tier:</strong> ${tier} / 30 (${saveData.passXp} XP)</div>
+      ${!saveData.vip ? `<button class="action-btn vip-btn" style="width:auto;" onclick="buyVip()">👑 VIP ($3.99)</button>` : ''}
+    </div>`;
+}
+
+function renderLeaderboardModal() {
+  const listEl = document.getElementById('leaderboardList');
+  listEl.innerHTML = '';
+  const entries = [...window.onlineLeaderboardEntries];
+  entries.sort((a, b) => b.score - a.score);
+  entries.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.07);border-radius:10px;font-weight:800;font-size:13px;';
+    row.innerHTML = `<span>#${idx + 1} ${item.name}</span><span>${item.score}</span>`;
+    listEl.appendChild(row);
+  });
+}
+
+function updateTopHeaderUI() {
+  document.getElementById('diamondCount').textContent = saveData.diamonds;
+  document.getElementById('shieldCount').textContent = saveData.shields;
+  document.getElementById('slowMoCount').textContent = saveData.slowMo;
+  document.getElementById('doublerCount').textContent = saveData.gemDoubler;
+  document.getElementById('vipCrownPill').classList.toggle('active', !!saveData.vip);
+  document.getElementById('homeVipBadge').textContent = saveData.vip ? '👑 VIP ACTIVE' : '👑 VIP $3.99';
+  const today = getTodayKey();
+  document.getElementById('dailyGiftLabel').textContent = saveData.lastDailyGiftDate === today ? 'Claimed' : (saveData.vip ? '+30 💎 Gift' : '+10 💎 Gift');
+  const adLeft = getRemainingAdSpinsToday();
+  document.getElementById('homeWheelBadge').textContent = saveData.lastFreeSpinDate !== today ? 'Free Spin!' : `Ad Spins ${adLeft}/2`;
+}
+
+updateTopHeaderUI();
+requestAnimationFrame(updateAndRender);
+</script>
+</body>
+</html>
