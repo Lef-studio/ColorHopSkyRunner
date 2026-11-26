@@ -1,0 +1,25 @@
+{
+"short_name": "Color Hop!",
+"name": "Color Hop! 3D Sky Runner — LEF STUDIO",
+"description": "3D Arcade Sky Runner by LEF STUDIO",
+"start_url": "./index.html",
+"scope": "./",
+"display": "fullscreen",
+"orientation": "portrait",
+"background_color": "#1899e8",
+"theme_color": "#1899e8",
+"icons": [
+{
+"src": "https://placehold.co/192x192/1899e8/ffffff.png?text=CH",
+"sizes": "192x192",
+"type": "image/png",
+"purpose": "any"
+},
+{
+"src": "https://placehold.co/512x512/1899e8/ffffff.png?text=Color+Hop",
+"sizes": "512x512",
+"type": "image/png",
+"purpose": "any"
+}
+]
+}
