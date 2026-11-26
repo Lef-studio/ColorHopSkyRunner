@@ -160,6 +160,11 @@
   .compare-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
   .compare-table th, .compare-table td { border: 1px solid rgba(255,255,255,0.15); padding: 6px 8px; text-align: center; }
   .compare-table th { background: rgba(255,255,255,0.1); }
+  .name-input {
+    flex: 1; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.28);
+    background: rgba(255,255,255,0.08); color: #fff; font-weight: 800; font-size: 13px;
+    user-select: text; -webkit-user-select: text;
+  }
 </style>
 </head>
 <body>
@@ -290,14 +295,19 @@
   </div>
 </div>
 
-<!-- LEADERBOARD MODAL (BLANK BY DEFAULT FOR LIVE BACKEND HOOK) -->
+<!-- LIVE FIREBASE LEADERBOARD MODAL -->
 <div class="modal-backdrop" id="leaderboardModal">
   <div class="modal-card">
     <div class="modal-header">
-      <div class="modal-title">🏆 Online Leaderboard</div>
+      <div class="modal-title">🏆 Live Global Leaderboard</div>
       <button class="close-btn" onclick="closeModal('leaderboardModal')">✕</button>
     </div>
     <div class="modal-body">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input id="playerNameInput" class="name-input" type="text" maxlength="16" placeholder="Your Nickname...">
+        <button class="action-btn" style="width:auto;padding:8px 14px;" onclick="savePlayerNickname()">Save</button>
+      </div>
+      <div id="leaderboardStatus" style="font-size:11px;opacity:0.75;text-align:center;">Connected to Cloud Leaderboard</div>
       <div id="leaderboardList" style="display:flex;flex-direction:column;gap:6px;min-height:140px;"></div>
     </div>
   </div>
@@ -424,7 +434,6 @@ function openRewardedAd(reason, onComplete) {
   if (window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd === 'function') {
     window.AndroidBridge.showRewardedAd(reason);
   } else {
-    // Ready for real AdMob SDK callback via window.onRewardedAdComplete()
     console.log("AdMob hook triggered for:", reason, "— call window.onRewardedAdComplete() from Android SDK.");
   }
 }
@@ -460,6 +469,28 @@ window.setOnlineLeaderboard = function(entries) {
   window.onlineLeaderboardEntries = Array.isArray(entries) ? entries : [];
   renderLeaderboardModal();
 };
+
+function getSavedNickname() {
+  let name = localStorage.getItem('colorHop_playerName');
+  if (!name) {
+    name = 'Hopper_' + Math.floor(1000 + Math.random() * 9000);
+    localStorage.setItem('colorHop_playerName', name);
+  }
+  return name;
+}
+
+function savePlayerNickname() {
+  const inp = document.getElementById('playerNameInput');
+  if (!inp) return;
+  const cleaned = inp.value.trim().slice(0, 16);
+  if (!cleaned) return;
+  localStorage.setItem('colorHop_playerName', cleaned);
+  const statusEl = document.getElementById('leaderboardStatus');
+  if (statusEl) statusEl.textContent = '✅ Nickname saved as ' + cleaned + '! Syncing...';
+  if (window.uploadBestScoreToCloud) {
+    window.uploadBestScoreToCloud(saveData.bestScore);
+  }
+}
 
 /* AUDIO SYNTHESIZER (3 EDM STATIONS) */
 const STATIONS = [
@@ -508,8 +539,8 @@ let difficultyMult = 0.90;
 let currentShopTab = 'skins';
 
 const gameState = {
-  phase: 'HOME', // HOME | PLAYING | COUNTDOWN
-  mode: 'endless', // endless | level | race
+  phase: 'HOME',
+  mode: 'endless',
   activeLevel: 1,
   practice: false,
   runMode: 'normal',
@@ -686,7 +717,6 @@ function draw3DBallSkin(targetCtx, cx, cy, r, skinId, activeHueColor, tick) {
   const skin = BALL_SKINS.find(s => s.id === skinId) || BALL_SKINS[0];
   targetCtx.save();
 
-  // Base 3D Sphere Gradient
   const grad = targetCtx.createRadialGradient(cx - r * 0.32, cy - r * 0.32, r * 0.12, cx, cy, r);
   grad.addColorStop(0, '#ffffff');
   grad.addColorStop(0.35, activeHueColor || skin.color);
@@ -696,14 +726,12 @@ function draw3DBallSkin(targetCtx, cx, cy, r, skinId, activeHueColor, tick) {
   targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
   targetCtx.fill();
 
-  // Outer Accent Aura Ring
   targetCtx.strokeStyle = skin.accent;
   targetCtx.lineWidth = Math.max(1.5, r * 0.1);
   targetCtx.beginPath();
   targetCtx.arc(cx, cy, r * 0.72, tick * 0.04, tick * 0.04 + Math.PI * 1.4);
   targetCtx.stroke();
 
-  // Special Geometry for VIP Royal Sovereign & Secret Omega Singularity
   if (skinId === 'royal_sovereign' || skinId === 'demon_crown' || skinId === 'starlight_halo') {
     targetCtx.fillStyle = '#ffd700';
     targetCtx.beginPath();
@@ -737,7 +765,6 @@ function project3D(laneX, tileZ, yOffset = 0) {
   const screenX = w * 0.5 + laneX * (w * 0.42) * scale;
   let screenY = horizonY + groundSpan * scale - yOffset * scale;
 
-  // Upside-down runway inversion
   if (gameState.inversionLerp > 0.01) {
     const invertedY = h - screenY;
     screenY = screenY * (1 - gameState.inversionLerp) + invertedY * gameState.inversionLerp;
@@ -751,12 +778,10 @@ function updateAndRender() {
   tickCount++;
   const pair = COLOR_PAIRS[pairIdx];
 
-  // Smooth mode transitions
   const targetInv = gameState.runMode === 'upside_down' ? 1 : 0;
   gameState.inversionLerp += (targetInv - gameState.inversionLerp) * 0.1;
 
   if (gameState.phase === 'HOME') {
-    // Platform-locked Lobby Hopping
     const hopSpeed = 0.032;
     gameState.hopProgress += hopSpeed;
     const currIdx = Math.floor(gameState.cameraZ);
@@ -819,7 +844,6 @@ function updateAndRender() {
           }
         }
 
-        // Valid landing
         tile.bounce = 1;
         gameState.score++;
         document.getElementById('liveScoreText').textContent = gameState.score;
@@ -835,7 +859,6 @@ function updateAndRender() {
           activateRandomRunMode();
         }
 
-        // Check Level or 50-Tile Race completion
         const targetGoal = gameState.mode === 'race' ? 50 : (gameState.mode === 'level' ? 18 + gameState.activeLevel * 2 : 999999);
         if (gameState.score >= targetGoal) {
           handleRunVictory();
@@ -865,7 +888,6 @@ function updateAndRender() {
     const tileH = 34 * p.scale;
     const tColor = t.colorIdx === 0 ? pair.c0 : pair.c1;
 
-    // 3D Platform Extrusion & Top Face
     ctx.fillStyle = '#0c162d';
     ctx.fillRect(p.x - tileW * 0.5, p.y - tileH * 0.5 + 8 * p.scale, tileW, tileH);
     ctx.fillStyle = tColor;
@@ -876,7 +898,6 @@ function updateAndRender() {
     ctx.fill();
     ctx.stroke();
 
-    // Random Mode Portal Gate
     if (t.hasPortal) {
       ctx.strokeStyle = '#ffd700';
       ctx.lineWidth = Math.max(2, 4 * p.scale);
@@ -885,7 +906,6 @@ function updateAndRender() {
       ctx.stroke();
     }
 
-    // Floating Diamond
     if (t.hasGem && !t.gemTaken) {
       ctx.fillStyle = '#00f2fe';
       ctx.beginPath();
@@ -902,7 +922,6 @@ function updateAndRender() {
   const invDir = gameState.inversionLerp > 0.5 ? -1 : 1;
   const orbCenterY = ballProj.y - invDir * (ballRadius * 0.92);
 
-  // Surface Contact Shadow
   const groundProj = project3D(gameState.ballX, gameState.cameraZ, 0);
   ctx.fillStyle = 'rgba(0,0,0,0.28)';
   ctx.beginPath();
@@ -917,7 +936,6 @@ function updateAndRender() {
 
 function handleRunCrash(tileIdx) {
   if (gameState.practice) {
-    // Respawn on current tile in Practice Mode
     const safeTile = gameState.tiles[tileIdx] || gameState.tiles[0];
     gameState.ballX = safeTile.laneX;
     gameState.targetX = safeTile.laneX;
@@ -925,7 +943,12 @@ function handleRunCrash(tileIdx) {
     return;
   }
   gameState.phase = 'COUNTDOWN';
-  if (gameState.score > saveData.bestScore) saveData.bestScore = gameState.score;
+  if (gameState.score > saveData.bestScore) {
+    saveData.bestScore = gameState.score;
+  }
+  if (window.uploadBestScoreToCloud && saveData.bestScore > 0) {
+    window.uploadBestScoreToCloud(saveData.bestScore);
+  }
   saveData.passXp += (saveData.vip ? 20 : 10);
   saveGame();
 
@@ -958,10 +981,16 @@ function handleRunVictory() {
   const finalReward = saveData.vip ? baseReward * 2 : baseReward;
   saveData.diamonds += finalReward;
 
+  if (gameState.score > saveData.bestScore) {
+    saveData.bestScore = gameState.score;
+  }
+  if (window.uploadBestScoreToCloud && saveData.bestScore > 0) {
+    window.uploadBestScoreToCloud(saveData.bestScore);
+  }
+
   if (gameState.mode === 'level' && !gameState.practice) {
     const k = 'lvl_' + gameState.activeLevel;
     saveData.levelClears[k] = (saveData.levelClears[k] || 0) + 1;
-    // Check Secret Achievement (3x clears across all 20 stages)
     let all3x = true;
     for (let s = 1; s <= 20; s++) {
       if ((saveData.levelClears['lvl_' + s] || 0) < 3) all3x = false;
@@ -985,7 +1014,12 @@ function openModal(id) {
   if (id === 'levelsModal') renderLevelsModal();
   if (id === 'questsModal') renderQuestsModal();
   if (id === 'passModal') renderPassModal();
-  if (id === 'leaderboardModal') renderLeaderboardModal();
+  if (id === 'leaderboardModal') {
+    const inp = document.getElementById('playerNameInput');
+    if (inp) inp.value = getSavedNickname();
+    if (window.syncCloudLeaderboard) window.syncCloudLeaderboard();
+    renderLeaderboardModal();
+  }
   document.getElementById(id).classList.add('open');
 }
 function closeModal(id) {
@@ -1206,7 +1240,8 @@ function renderLeaderboardModal() {
   entries.sort((a, b) => b.score - a.score);
   entries.forEach((item, idx) => {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.07);border-radius:10px;font-weight:800;font-size:13px;';
+    const highlight = item.isPlayer ? 'border:1px solid #ffd700;background:rgba(255,215,0,0.16);' : 'background:rgba(255,255,255,0.07);';
+    row.style.cssText = `display:flex;justify-content:space-between;padding:8px 12px;${highlight}border-radius:10px;font-weight:800;font-size:13px;`;
     row.innerHTML = `<span>#${idx + 1} ${item.name}</span><span>${item.score}</span>`;
     listEl.appendChild(row);
   });
@@ -1227,6 +1262,72 @@ function updateTopHeaderUI() {
 
 updateTopHeaderUI();
 requestAnimationFrame(updateAndRender);
+</script>
+
+<!-- LIVE FIREBASE CLOUD LEADERBOARD INTEGRATION (ColorHopSkyRunner) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB4RIV4hhOdWIbIMi8AyDRHfvhAcsMCL6o",
+    authDomain: "colorhopskyrunner-20c40.firebaseapp.com",
+    projectId: "colorhopskyrunner-20c40",
+    storageBucket: "colorhopskyrunner-20c40.firebasestorage.app",
+    messagingSenderId: "969840571715",
+    appId: "1:969840571715:web:4b8af7eb6efd3d1a092bf6"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  let currentUserId = null;
+
+  window.syncCloudLeaderboard = async function() {
+    try {
+      const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(50));
+      const snap = await getDocs(q);
+      const entries = [];
+      snap.forEach(d => {
+        const data = d.data();
+        entries.push({
+          name: data.name || "Hopper",
+          score: data.score || 0,
+          isPlayer: d.id === currentUserId
+        });
+      });
+      window.setOnlineLeaderboard(entries);
+    } catch (err) {
+      console.error("Cloud Leaderboard fetch error:", err);
+    }
+  };
+
+  window.uploadBestScoreToCloud = async function(bestScore) {
+    if (!currentUserId || bestScore <= 0) return;
+    try {
+      const playerName = localStorage.getItem('colorHop_playerName') || ('Hopper_' + currentUserId.slice(0, 4));
+      await setDoc(doc(db, "leaderboard", currentUserId), {
+        name: playerName,
+        score: Number(bestScore),
+        updatedAt: Date.now()
+      }, { merge: true });
+      await window.syncCloudLeaderboard();
+    } catch (err) {
+      console.error("Cloud Score upload error:", err);
+    }
+  };
+
+  signInAnonymously(auth).catch(err => console.error("Anonymous Auth error:", err));
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUserId = user.uid;
+      window.syncCloudLeaderboard();
+      if (typeof saveData !== 'undefined' && saveData.bestScore > 0) {
+        window.uploadBestScoreToCloud(saveData.bestScore);
+      }
+    }
+  });
 </script>
 </body>
 </html>
